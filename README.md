@@ -1,5 +1,9 @@
 # BGAutomatisation
 
+> *Un des quatre modèles neutres du [portfolio public de BG Informatique](https://bginformatique.ca) — service informatique pour PME et particuliers, Saint-Jérôme et Laurentides.*
+>
+> C'est la suite que je fais tourner moi-même pour mon propre marketing, pas une démo écrite pour l'occasion — d'où le ton opérationnel qui suit : installation, jetons à configurer, systemd. Le principe qui structure tout le reste : un orchestrateur (`lanceur.py`) exécute des agents Claude à partir d'une file Firestore, mais **rien de risqué ne part sans un geste humain explicite** — publier, envoyer, dépenser s'arrêtent tous au guichet d'autorisations avant de continuer.
+
 **MODÈLE NEUTRE.** Voir `PARAMETRES-A-CONFIGURER.md` avant tout déploiement.
 
 Suite d'automatisation qui fait avancer un tableau de bord marketing sans
