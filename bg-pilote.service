@@ -1,0 +1,7 @@
+[Unit]
+Description=Pilote marketing — la prochaine tâche du tableau de bord part seule
+
+[Service]
+Type=oneshot
+ExecStartPre="{{CHEMIN_INSTALLATION}}/attendre_reseau.sh"
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/pilote.py"

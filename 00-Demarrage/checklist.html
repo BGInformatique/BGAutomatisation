@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Démarrage — comptes et logiciels</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .3rem; }
+  ul { list-style: none; padding: 0; }
+  li { margin: .6rem 0; padding: .5rem .6rem; border-radius: .4rem; }
+  li.done { opacity: .55; text-decoration: line-through; }
+  label { cursor: pointer; display: flex; gap: .6rem; align-items: flex-start; }
+  input[type=checkbox] { margin-top: .3rem; }
+  .note { font-size: .9rem; opacity: .75; margin: .1rem 0 0 1.9rem; }
+  code { background: #8882; padding: .1rem .3rem; border-radius: .2rem; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+
+<h1>Démarrage — comptes et logiciels pour un nouveau client</h1>
+<p>Checklist manuelle : rien ici n'est automatisé sur des comptes tiers. Chaque
+case cochée est mémorisée dans ce navigateur (<code>localStorage</code>), pas
+ailleurs.</p>
+
+<h2>1. Comptes IA</h2>
+<ul id="ia">
+  <li>
+    <label><input type="checkbox" data-id="claude">
+    Créer/choisir un compte <a href="https://claude.ai" target="_blank" rel="noopener">Claude</a>
+    au forfait voulu par le client (ou aucun, si l'onglet 3 suffit).</label>
+  </li>
+  <li>
+    <label><input type="checkbox" data-id="openrouter">
+    Créer une clé API sur <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a>.</label>
+    <div class="note">Aucun paiement requis pour démarrer : les modèles marqués
+    <code>:free</code> suffisent à faire tourner OpenClaw (voir section 3).</div>
+  </li>
+  <li>
+    <label><input type="checkbox" data-id="autres-ia">
+    Autres IA voulues par le client, s'il y en a (clé API à noter à part).</label>
+  </li>
+</ul>
+
+<h2>2. Comptes Meta (Facebook / Instagram)</h2>
+<ul id="meta">
+  <li>
+    <label><input type="checkbox" data-id="business-suite">
+    Page Facebook + compte Instagram professionnel liés, dans
+    <a href="https://business.facebook.com" target="_blank" rel="noopener">Meta Business Suite</a>.</label>
+  </li>
+  <li>
+    <label><input type="checkbox" data-id="meta-dev">
+    Appli créée sur <a href="https://developers.facebook.com" target="_blank" rel="noopener">Meta for Developers</a>,
+    jetons Graph API (Facebook + Instagram) générés et notés.</label>
+  </li>
+</ul>
+
+<h2>3. Infrastructure</h2>
+<ul id="infra">
+  <li>
+    <label><input type="checkbox" data-id="firebase">
+    Projet créé dans la <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console Firebase</a>
+    (Firestore activé).</label>
+  </li>
+  <li>
+    <label><input type="checkbox" data-id="sa">
+    Compte de service créé, clé JSON téléchargée et rangée hors du dépôt git.</label>
+  </li>
+</ul>
+
+<h2>4. Logiciels locaux</h2>
+<ul id="local">
+  <li>
+    <label><input type="checkbox" data-id="openclaw">
+    OpenClaw installé et configuré :
+    <code>bash installer-openclaw.sh</code></label>
+    <div class="note">Installe la passerelle OpenClaw et met en place un
+    routage 100 % gratuit par défaut (modèles OpenRouter <code>:free</code>
+    seulement). La clé Claude payante, si le client en prend une, s'ajoute
+    ensuite avec <code>openclaw configure</code>.</div>
+  </li>
+  <li>
+    <label><input type="checkbox" data-id="claude-chrome">
+    Extension « Claude for Chrome » installée, si le poste en a besoin.</label>
+    <div class="note">Chercher « Claude » dans le Chrome Web Store
+    (<code>chrome://extensions</code> → Chrome Web Store) plutôt qu'un lien
+    direct, pour toujours tomber sur la fiche à jour.</div>
+  </li>
+</ul>
+
+<script>
+(function () {
+  var KEY = "demarrage-client-checklist";
+  var etat = {};
+  try { etat = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+
+  document.querySelectorAll("input[type=checkbox][data-id]").forEach(function (cb) {
+    var id = cb.dataset.id;
+    cb.checked = !!etat[id];
+    cb.closest("li").classList.toggle("done", cb.checked);
+    cb.addEventListener("change", function () {
+      etat[id] = cb.checked;
+      cb.closest("li").classList.toggle("done", cb.checked);
+      try { localStorage.setItem(KEY, JSON.stringify(etat)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>

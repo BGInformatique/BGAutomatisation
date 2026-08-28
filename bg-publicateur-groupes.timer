@@ -1,0 +1,10 @@
+[Unit]
+Description=Préparateur de publications — groupes Facebook, 10 h et 15 h (deux passages pour les jours à deux groupes)
+
+[Timer]
+OnCalendar=*-*-* 10:00
+OnCalendar=*-*-* 15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

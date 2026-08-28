@@ -1,0 +1,9 @@
+[Unit]
+Description=Pilote marketing — passage quotidien à 9 h 15
+
+[Timer]
+OnCalendar=*-*-* 09:15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Vigie marketing — surveillance quotidienne du montage {{ENTREPRISE}}
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/vigie.py"

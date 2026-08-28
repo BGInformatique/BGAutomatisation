@@ -1,0 +1,16 @@
+[Unit]
+Description=Pont Espace client — demandes des clients web vers les outils internes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/pont_clients.py"
+# Le pont est une boucle : s'il tombe (réseau coupé, jeton expiré, panne
+# Firestore), il doit revenir tout seul. Sans ça, les demandes d'un client
+# resteraient invisibles jusqu'à ce que quelqu'un s'en aperçoive.
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

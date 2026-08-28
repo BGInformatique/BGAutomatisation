@@ -1,0 +1,6 @@
+[Unit]
+Description=Renouvellement du jeton Instagram {{ENTREPRISE}}, si l'échéance approche
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/renouveler_instagram.py"

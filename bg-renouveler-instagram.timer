@@ -1,0 +1,12 @@
+[Unit]
+Description=Renouvellement du jeton Instagram {{ENTREPRISE}} — vérification hebdomadaire
+
+[Timer]
+# Le jeton expire après 60 jours ; renouveler_instagram.py ne fait rien tant
+# qu'il reste plus de 10 jours avant l'échéance. Un passage par semaine est
+# largement assez pour ne jamais laisser passer la fenêtre.
+OnCalendar=Mon *-*-* 08:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Publicateur Instagram {{ENTREPRISE}} — une publication de la file, si une est due
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/publicateur_instagram.py"

@@ -1,0 +1,6 @@
+[Unit]
+Description=Recherchiste marketing — recherche hebdomadaire de nouveaux prospects
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/recherchiste.py" --nombre 15

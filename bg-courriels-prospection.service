@@ -1,0 +1,19 @@
+[Unit]
+Description=Courriels de prospection — passerelle entre le tableau de bord et Thunderbird
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Thunderbird est une application graphique : sans DISPLAY, le service tourne
+# mais aucune fenêtre n'apparaît, et l'échec est silencieux.
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/courriels_prospection.py"
+# La passerelle est une boucle : si elle tombe (réseau, session graphique
+# redémarrée), elle doit revenir seule — sinon un clic sur « ✉ écrire »
+# resterait sans effet, sans que rien ne le dise.
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

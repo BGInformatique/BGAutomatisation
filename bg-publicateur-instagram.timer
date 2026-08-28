@@ -1,0 +1,13 @@
+[Unit]
+Description=Publication Instagram {{ENTREPRISE}} — jeudi 18 h 30 et dimanche 10 h
+
+[Timer]
+# Mêmes fenêtres que le publicateur Facebook. Le script lui-même garantit au
+# plus une publication par 3 jours : le dimanche ne rattrape que si le jeudi
+# a sauté. Pas de Persistent= : hors fenêtre, une publication ne vaut pas la
+# peine — la prochaine fenêtre la prendra.
+OnCalendar=Thu *-*-* 18:30
+OnCalendar=Sun *-*-* 10:00
+
+[Install]
+WantedBy=timers.target

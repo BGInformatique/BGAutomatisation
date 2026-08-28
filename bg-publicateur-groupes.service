@@ -1,0 +1,10 @@
+[Unit]
+Description=Préparateur de publications — groupes Facebook (ouvre l'onglet, prépare le presse-papier)
+
+[Service]
+Type=oneshot
+# L'appel à Opus (via OpenClaw) peut prendre plusieurs minutes — bien au-delà
+# du TimeoutStartSec par défaut de systemd (90 s), qui tuerait le service en
+# plein milieu de la génération.
+TimeoutStartSec=600
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/preparer_groupes.py"

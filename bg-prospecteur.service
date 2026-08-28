@@ -1,0 +1,6 @@
+[Unit]
+Description=Prospecteur marketing — cycle hebdomadaire de relances
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/prospecteur.py"

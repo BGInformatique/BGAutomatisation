@@ -1,0 +1,6 @@
+[Unit]
+Description=Publicateur Facebook {{ENTREPRISE}} — une publication du lot, si une est due
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/publicateur.py"
