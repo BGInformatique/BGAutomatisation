@@ -1,5 +1,10 @@
 # Publicateur Facebook — chantier 2 de la campagne {{ENTREPRISE}}
 
+**Pour être guidé pas à pas** (Page, jeton, choix local/cloud) sans lire ce
+fichier en entier : `python3 configurer_reseaux_sociaux.py`. Ce qui suit
+reste la référence détaillée — utile pour dépanner ou comprendre le pourquoi
+de chaque étape.
+
 `publicateur.py` publie les textes du lot résidentiel sur la Page Facebook de
 {{ENTREPRISE}}, une fois par semaine, sans intervention. Les textes restent
 dans `Campagne_BG/Contenus/Facebook-Residentiel-Lot-1.md` — c'est la seule

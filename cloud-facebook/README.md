@@ -1,5 +1,10 @@
 # Publication Facebook — version cloud (GitHub Actions)
 
+**Pour être guidé pas à pas** (y compris la copie de ces deux fichiers et le
+secret GitHub) : `python3 ../configurer_reseaux_sociaux.py`, option Facebook
+→ choix « cloud ». Ce qui suit reste la référence si tu préfères le faire à
+la main.
+
 Ce dossier n'est PAS destiné à rester ici. Il montre comment faire tourner
 `publicateur.py` (voir la racine de ce dépôt) même quand votre ordinateur est
 éteint, en le déplaçant sur GitHub Actions plutôt que sur une minuterie

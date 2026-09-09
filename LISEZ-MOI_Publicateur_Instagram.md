@@ -1,5 +1,9 @@
 # Publicateur Instagram — jumeau du publicateur Facebook
 
+**Pour être guidé pas à pas** sans lire ce fichier en entier :
+`python3 configurer_reseaux_sociaux.py`. Ce qui suit reste la référence
+détaillée — utile pour dépanner ou comprendre le pourquoi de chaque étape.
+
 `publicateur_instagram.py` publie sur `https://www.instagram.com/{{HANDLE}}/`
 depuis `Campagne_BG/Contenus/_File_Instagram.tsv` — cette file EST la source
 de vérité (image + légende ensemble), pas juste un état comme pour Facebook.

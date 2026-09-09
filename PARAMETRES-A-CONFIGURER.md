@@ -94,6 +94,9 @@ rendue. Rien à configurer ici — ça marche dès que `lanceur.py` tourne.
 
 ## 5. Facebook et Instagram
 
+Chemin rapide, guidé : `python3 configurer_reseaux_sociaux.py` (orchestre
+tout ce qui suit, y compris le choix local/cloud et le secret GitHub).
+
 Marche à suivre complète, étape par étape : `LISEZ-MOI_Publicateur.md`
 (Facebook) et `LISEZ-MOI_Publicateur_Instagram.md` (Instagram — dépend du
 jeton généré par `configurer_instagram.py`, renouvelé automatiquement par
