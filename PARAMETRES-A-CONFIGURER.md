@@ -35,6 +35,10 @@ seulement la première occurrence par fichier.
 | `{{MANDAT_EXEMPLE}}` | partout | voir § 2 — nom du second mandat, ou à retirer si vous n'en avez pas |
 | `{{COURRIEL_MANDAT_EXEMPLE}}`, `{{TELEPHONE_MANDAT_EXEMPLE}}` | `courriels_mandat_exemple.py`, `courriels_prospection.py`, `prospecteur.py` | coordonnées du second mandat |
 | `{{DOSSIER_BATCHS_COURRIELS}}` | `courriels_mandat_exemple.py` | voir § 7 — nom du dossier d'un batch de courriels de prospection |
+| `{{ORG_GITHUB}}` | `sante_facebook.py`, `synchroniser_publicateur_facebook.py` | votre nom d'organisation/utilisateur GitHub (celui qui possède le dépôt de votre site) |
+| `{{APP_FACEBOOK}}` | `configurer_facebook.py`, `LISEZ-MOI_Publicateur.md` | nom de votre app développeur Facebook (voir `LISEZ-MOI_Publicateur.md` étape 2) |
+| `{{PAGE_ID_FACEBOOK}}` | `configurer_facebook.py`, `cloud-facebook/publicateur_cloud.py` | id de votre Page Facebook — présélection pratique, pas un secret ; laissez tel quel pour choisir la Page à la main au premier lancement de `configurer_facebook.py` |
+| `{{FUSEAU_HORAIRE}}` | `cloud-facebook/publicateur_cloud.py` | votre fuseau au format `zoneinfo` (ex. `America/Toronto`, `Europe/Paris`) — seulement si vous activez le chemin cloud, voir § 5 |
 
 ## 2. Le mandat `{{MANDAT_EXEMPLE}}` — une vraie fonctionnalité, pas un exemple jetable
 
@@ -97,8 +101,21 @@ jeton généré par `configurer_instagram.py`, renouvelé automatiquement par
 leur fichier de jeton n'existe pas : aucun risque de publication accidentelle
 pendant la configuration.
 
-`installer_jeton.py` fait aussi le jeton Facebook, en version guidée
-interactive — alternative à la marche à suivre manuelle du LISEZ-MOI.
+`configurer_facebook.py` (recommandé) et `installer_jeton.py` font tous
+deux le jeton Facebook en version guidée interactive, à partir de deux
+points de départ différents : `configurer_facebook.py` part d'un jeton
+COURT et fait l'échange lui-même (App ID + App secret requis) ;
+`installer_jeton.py` part d'un jeton UTILISATEUR déjà prolongé à la main au
+Débogueur. Les deux écrivent le même `facebook_jeton.json` — n'utilisez
+qu'un seul des deux, celui qui colle à l'étape où vous en êtes dans
+`LISEZ-MOI_Publicateur.md`.
+
+Publication cloud (GitHub Actions, marche même l'ordinateur éteint) :
+facultative, voir `cloud-facebook/README.md` — deux fichiers à copier dans
+le dépôt de votre site, jetons `{{ORG_GITHUB}}`, `{{PAGE_ID_FACEBOOK}}` et
+`{{FUSEAU_HORAIRE}}` à remplacer, secret GitHub `FB_PAGE_TOKEN` à créer.
+N'activez JAMAIS ce chemin en même temps que `bg-publicateur.timer` local :
+les deux publieraient chaque billet en double.
 
 ## 6. Hébergement des images Instagram
 

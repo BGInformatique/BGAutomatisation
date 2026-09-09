@@ -29,9 +29,11 @@ cadre qu'on lui a fixé.
 | `pilote.py` | Fait avancer le tableau de bord tout seul, une tâche à la fois |
 | `vigie.py` | Surveillance quotidienne (services, guichet, montage Facebook, etc.) et alertes |
 | `pont_clients.py` | Fait passer les demandes d'un espace client externe vers les outils internes, et vice-versa |
-| `publicateur.py` / `publicateur_instagram.py` | Publication automatique Facebook / Instagram, une fois par semaine |
-| `installer_jeton.py` / `configurer_instagram.py` / `renouveler_instagram.py` | Mise en place et renouvellement des jetons Facebook / Instagram |
-| `sante_facebook.py` | Diagnostic en un coup d'œil du montage Facebook |
+| `publicateur.py` / `publicateur_instagram.py` | Publication automatique Facebook (local) / Instagram, une fois par semaine |
+| `cloud-facebook/` | Jumeau de `publicateur.py` pensé pour GitHub Actions — publie même l'ordinateur éteint, voir `LISEZ-MOI_Publicateur.md` § Cloud vs local |
+| `synchroniser_publicateur_facebook.py` | Tient la copie locale et la copie du dépôt cloud alignées, lancé par `vigie.py` |
+| `installer_jeton.py` / `configurer_facebook.py` / `configurer_instagram.py` / `renouveler_instagram.py` | Mise en place et renouvellement des jetons Facebook / Instagram |
+| `sante_facebook.py` | Diagnostic en un coup d'œil du montage Facebook (local ET cloud) |
 | `prospecteur.py` / `recherchiste.py` | Cycle de prospection : trouve des candidats, rédige les premiers contacts et relances |
 | `courriels_prospection.py` / `courriels_mandat_exemple.py` | Ouvrent les courriels de prospection dans Thunderbird, sans jamais les envoyer |
 | `preparer_groupes.py` | Prépare une publication pour un groupe Facebook (presse-papier + onglet), le clic final reste humain |

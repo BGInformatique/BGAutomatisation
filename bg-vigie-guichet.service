@@ -1,0 +1,6 @@
+[Unit]
+Description=Vigie — guichet seul (ferme le caduc, rappelle ce qui dort)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 "{{CHEMIN_INSTALLATION}}/vigie.py" --guichet

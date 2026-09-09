@@ -1,0 +1,13 @@
+[Unit]
+Description=Vigie — passage guichet toutes les deux heures, 8 h à 20 h
+
+[Timer]
+# Léger : ni Facebook ni sonde du site, juste le guichet — sûr à répéter
+# souvent. Le passage complet (bg-vigie.timer) fait tout le reste une
+# fois par jour, ça ne change pas.
+OnCalendar=*-*-* 08,10,12,14,16,18,20:20:00
+Persistent=true
+RandomizedDelaySec=180
+
+[Install]
+WantedBy=timers.target

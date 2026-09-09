@@ -30,6 +30,7 @@ ICI = os.path.dirname(os.path.abspath(__file__))
 JETON = os.path.join(ICI, "facebook_jeton.json")
 FILE_TSV = os.path.expanduser(
     "~/Bureau/{{ENTREPRISE}}/02_Marketing/Campagne_BG/Contenus/_File_Facebook.tsv")
+DEPOT_SITE_COMPLET = "{{ORG_GITHUB}}/{{DEPOT_SITE}}"
 GRAPH = "https://graph.facebook.com/v23.0"
 
 OK, ALERTE, MORT = "✅", "⚠️ ", "❌"
@@ -143,16 +144,35 @@ else:
         dire(OK, "rien n'a encore été publié par le script")
         dire(ALERTE, "il ne voit pas les billets publiés à la main sur la Page")
 
-# ─────────────────────────────── 4. la minuterie
-print("\n4. MINUTERIE")
-r = subprocess.run(["systemctl", "--user", "list-timers", "bg-publicateur.timer",
-                    "--all", "--no-pager"], capture_output=True, text=True)
-ligne = next((l for l in r.stdout.splitlines() if "bg-publicateur" in l), "")
-etat = subprocess.run(["systemctl", "--user", "is-enabled", "bg-publicateur.timer"],
-                      capture_output=True, text=True).stdout.strip()
-dire(OK if etat == "enabled" else ALERTE, f"minuterie {etat or 'inconnue'}")
-if ligne:
-    dire(OK, "prochain passage : " + " ".join(ligne.split()[:5]))
+# ─────────────────────────────── 4. la publication (cloud, GitHub Actions)
+print("\n4. PUBLICATION (GitHub Actions — mardi et samedi midi, heure de Montréal)")
+etat_minuterie = subprocess.run(["systemctl", "--user", "is-enabled", "bg-publicateur.timer"],
+                                capture_output=True, text=True).stdout.strip()
+dire(OK if etat_minuterie != "enabled" else ALERTE,
+     f"minuterie locale bg-publicateur.timer : {etat_minuterie or 'inconnue'} "
+     + ("(voulu — le cloud publie désormais)" if etat_minuterie != "enabled"
+        else "— DEVRAIT être désactivée, elle publierait EN DOUBLE avec le cloud"))
+try:
+    r = subprocess.run(
+        ["gh", "run", "list", "--repo", DEPOT_SITE_COMPLET,
+         "--workflow", "publicateur-facebook.yml", "--limit", "3",
+         "--json", "status,conclusion,createdAt,event"],
+        capture_output=True, text=True, timeout=30)
+    if r.returncode != 0:
+        dire(ALERTE, f"impossible d'interroger GitHub Actions : {r.stderr.strip()[:200]}")
+    else:
+        runs = json.loads(r.stdout)
+        if not runs:
+            dire(ALERTE, "aucun passage cloud trouvé — le workflow a-t-il déjà tourné ?")
+        else:
+            dernier = runs[0]
+            ok = dernier.get("conclusion") in ("success", None)
+            dire(OK if ok else MORT,
+                 f"dernier passage cloud ({dernier.get('event')}) le "
+                 f"{dernier.get('createdAt', '?')[:16].replace('T', ' ')} : "
+                 f"{dernier.get('status')}/{dernier.get('conclusion') or 'en cours'}")
+except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+    dire(ALERTE, f"gh CLI indisponible pour vérifier le cloud ({e!r})")
 
 # ─────────────────────────────── verdict
 print("\n" + "─" * 60)

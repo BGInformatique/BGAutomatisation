@@ -2,8 +2,8 @@
 """Publicateur — publication Facebook automatisée de {{ENTREPRISE}}.
 
 Chantier 2 du plan de campagne (Plan-Campagne-{{ENTREPRISE}}-2026.md § 7). Lancé par
-bg-publicateur.timer le jeudi 18 h 30 et le dimanche 10 h — les deux fenêtres
-où le public résidentiel des Laurentides est sur Facebook. Ce qu'il fait :
+bg-publicateur.timer le mardi midi et le samedi midi — les deux fenêtres
+où votre public est sur Facebook. Ce qu'il fait :
 
   1. lit la file (_File_Facebook.tsv) et prend la première publication
      « a_publier », dans l'ordre ;
@@ -14,9 +14,13 @@ où le public résidentiel des Laurentides est sur Facebook. Ce qu'il fait :
      consigne la date et l'identifiant du billet dans la file.
 
 Au plus UNE publication par passage, et jamais deux à moins de trois jours
-d'écart : si le jeudi passe (machine éteinte), le dimanche rattrape, puis la
-cadence revient d'elle-même au jeudi. Publier plus souvent que le lot n'a été
+d'écart : si le mardi passe (machine éteinte), le samedi rattrape, puis la
+cadence revient d'elle-même au mardi. Publier plus souvent que le lot n'a été
 pensé n'apporte rien — la cadence du plan est hebdomadaire.
+
+Ce script est la version LOCALE, pensée pour tester avec --essai. Pour que
+la publication tourne même machine éteinte, voir cloud-facebook/ : un jumeau
+de ce script pensé pour GitHub Actions, avec les mêmes règles.
 
 SANS JETON, IL NE SE PASSE RIEN : le script sort en silence tant que
 facebook_jeton.json n'existe pas. On peut donc armer la minuterie avant même
@@ -47,8 +51,27 @@ FILE_TSV = os.path.join(CONTENUS, "_File_Facebook.tsv")
 JETON = os.path.join(ICI, "facebook_jeton.json")
 COLS = ["ID", "TITRE", "STATUT", "PUBLIE_LE", "POST_ID"]
 GRAPH = "https://graph.facebook.com/v23.0"
-JOURS_ENTRE = 3          # jeudi → dimanche bloqué ; dimanche → jeudi permis
+JOURS_ENTRE = 3          # mardi → samedi bloqué ; samedi → mardi permis
+DOSSIER_VISUELS = os.path.expanduser("~/Bureau/{{ENTREPRISE}}/02_Marketing/Visuels-Facebook")
+MANIFESTE_VISUELS = os.path.join(DOSSIER_VISUELS, "_Visuels.tsv")
 ESSAI = "--essai" in sys.argv
+
+
+def deplier(texte):
+    """Rend au texte ses paragraphes d'un seul tenant.
+
+    Le markdown est enroulé à ~88 colonnes pour rester lisible dans un
+    éditeur ; Facebook, lui, traite chaque retour de ligne comme un retour de
+    ligne. Publié tel quel, un paragraphe enroulé sort haché en plein milieu
+    des phrases. On recolle donc chaque paragraphe, et on ne garde que les
+    lignes vides qui les séparent.
+    """
+    paras = []
+    for bloc in texte.split("\n\n"):
+        lignes = [l.strip() for l in bloc.splitlines() if l.strip()]
+        if lignes:
+            paras.append(" ".join(lignes))
+    return "\n\n".join(paras)
 
 
 def lire_lot():
@@ -67,7 +90,7 @@ def lire_lot():
         for l in corps.splitlines():
             if l.startswith(">"):
                 lignes.append(l[1:].removeprefix(" "))
-        message = "\n".join(lignes).strip()
+        message = deplier("\n".join(lignes))
         if message:
             posts[num] = (titre, message)
     return posts
@@ -108,12 +131,58 @@ def amorcer_file(posts):
     return rangs
 
 
-def publier(page_id, jeton, message):
-    donnees = urllib.parse.urlencode(
-        {"message": message, "access_token": jeton}).encode()
-    req = urllib.request.Request(f"{GRAPH}/{page_id}/feed", data=donnees)
-    with urllib.request.urlopen(req, timeout=30) as rep:
-        return json.loads(rep.read()).get("id", "")
+def visuel_de(ref):
+    """Le chemin du visuel prêt pour cette publication, ou None.
+
+    Le manifeste Visuels-Facebook/_Visuels.tsv dit quel fichier accompagne
+    quelle publication. Un visuel encore « a_produire », ou dont le fichier
+    n'est pas déposé, ne bloque rien : la publication part en texte seul,
+    comme avant. Un billet sans image vaut mieux qu'un billet qui ne part pas.
+    """
+    if not os.path.exists(MANIFESTE_VISUELS):
+        return None
+    lignes = open(MANIFESTE_VISUELS, encoding="utf-8").read().splitlines()
+    if not lignes:
+        return None
+    entetes = lignes[0].split("\t")
+    for l in lignes[1:]:
+        c = dict(zip(entetes, l.split("\t") + [""] * len(entetes)))
+        if c.get("REF") == ref and c.get("ETAT") == "pret":
+            chemin = os.path.join(DOSSIER_VISUELS, "1x1", c.get("FICHIER", ""))
+            return chemin if os.path.exists(chemin) else None
+    return None
+
+
+def publier(page_id, jeton, message, image=None):
+    """Publie sur la Page. Avec une image si elle existe, sinon en texte seul.
+
+    Avec image, on passe par /photos en envoi direct du fichier (multipart) :
+    contrairement à Instagram, la Page n'exige PAS que l'image soit déjà
+    publique quelque part, ce qui évite tout hébergement intermédiaire.
+    """
+    if not image:
+        donnees = urllib.parse.urlencode(
+            {"message": message, "access_token": jeton}).encode()
+        req = urllib.request.Request(f"{GRAPH}/{page_id}/feed", data=donnees)
+        with urllib.request.urlopen(req, timeout=30) as rep:
+            return json.loads(rep.read()).get("id", "")
+
+    limite = "----{{ENTREPRISE}}" + os.urandom(8).hex()
+    corps = bytearray()
+    for cle, valeur in (("caption", message), ("access_token", jeton)):
+        corps += (f"--{limite}\r\nContent-Disposition: form-data; name=\"{cle}\"\r\n"
+                  f"\r\n{valeur}\r\n").encode()
+    corps += (f"--{limite}\r\nContent-Disposition: form-data; name=\"source\"; "
+              f"filename=\"{os.path.basename(image)}\"\r\n"
+              "Content-Type: image/jpeg\r\n\r\n").encode()
+    corps += open(image, "rb").read() + b"\r\n"
+    corps += f"--{limite}--\r\n".encode()
+
+    req = urllib.request.Request(f"{GRAPH}/{page_id}/photos", data=bytes(corps))
+    req.add_header("Content-Type", f"multipart/form-data; boundary={limite}")
+    with urllib.request.urlopen(req, timeout=120) as rep:
+        r = json.loads(rep.read())
+        return r.get("post_id") or r.get("id", "")
 
 
 def main():
@@ -157,13 +226,16 @@ def main():
         journaliser(f"publicateur : « {titre} » mentionne {{MANDAT_EXEMPLE}} — bloqué, à vérifier")
         return 1
 
+    image = visuel_de(f"lot1#{suivant['ID']}")
+
     if ESSAI:
-        print(f"partirait maintenant → {suivant['ID']} — {titre}\n")
+        print(f"partirait maintenant → {suivant['ID']} — {titre}")
+        print(f"visuel : {image or '(aucun — texte seul)'}\n")
         print(message)
         return 0
 
     try:
-        post_id = publier(page_id, jeton, message)
+        post_id = publier(page_id, jeton, message, image)
     except Exception as e:
         journaliser(f"publicateur : échec de publication « {titre} » : {e!r}")
         return 1
@@ -171,7 +243,8 @@ def main():
     suivant["PUBLIE_LE"] = aujourd_hui.isoformat()
     suivant["POST_ID"] = post_id
     ecrire_file(rangs)
-    journaliser(f"publicateur : publié — {suivant['ID']} « {titre} » ({post_id})")
+    journaliser(f"publicateur : publié — {suivant['ID']} « {titre} » ({post_id})"
+                + (f" avec {os.path.basename(image)}" if image else " — texte seul"))
     return 0
 
 

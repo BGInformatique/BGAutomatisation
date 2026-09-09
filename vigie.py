@@ -18,11 +18,12 @@ Ce qu'elle vérifie, dans l'ordre :
      les informations des deux mandats ne se confondent jamais.
   2. LANCEMENTS GELÉS : une demande du bouton éclair qui reste « demande »
      plus de 2 h signifie que bg-lanceur ne suit plus — il est relancé.
-  3. MONTAGE FACEBOOK : sante_facebook.py (jeton, droits, file, minuterie) ;
-     un verdict d'échec devient une alerte. Une file qui n'a rien publié
-     depuis plus de 10 jours alors que des textes attendent = alerte aussi
-     (le publicateur n'a pas de Persistent= : deux fenêtres ratées passent
-     sans trace ailleurs que dans journal.log).
+  3. MONTAGE FACEBOOK : synchroniser_publicateur_facebook.py aligne d'abord la
+     file locale sur le dépôt (la publication tourne dans le cloud, pas ici —
+     voir cloud-facebook/), puis sante_facebook.py (jeton, droits, file,
+     dernier passage GitHub Actions) ; un verdict d'échec devient une alerte.
+     Une file qui n'a rien publié depuis plus de 10 jours alors que des
+     textes attendent = alerte aussi.
   4. ÉPUISEMENT DU LOT FACEBOOK : à 3 textes restants ou moins, la vigie met
      en file UN lancement Claude qui rédige le lot 2 pour validation. Les
      textes s'arrêtent au guichet d'autorisations (cas « publication ») :
@@ -33,7 +34,13 @@ Ce qu'elle vérifie, dans l'ordre :
   6. SITE EN LIGNE : {{DOMAINE}}, les deux volets et sitemap.xml
      doivent répondre 200 avec le bon contenu ; GoatCounter doit exister.
   7. GUICHET DORMANT : une demande d'autorisation sans réponse depuis 5
-     jours est rappelée par une tâche au tableau de bord.
+     jours est rappelée par une tâche au tableau de bord. Avant ce rappel,
+     GUICHET CADUC ferme d'elle-même une demande devenue inutile (ex. « publier
+     ce guide » alors que le guide est déjà en ligne par un autre chemin) —
+     confirmé sur le fichier réel, jamais sur le seul texte de la demande.
+     Un passage allégé (bg-vigie-guichet.timer, plus fréquent que le passage
+     complet quotidien) ne fait QUE ce point, pour ne pas laisser une demande
+     caduque dormir une journée entière.
   8. BIBLIOTHÈQUE : tant que des guides du registre (_bibliotheque/
      sujets.tsv, liste CLOSE de 14) restent « a_ecrire », la vigie en met
      UN à la fois en rédaction (au plus un par semaine) via le lanceur.
@@ -72,6 +79,7 @@ import uuid
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import lanceur  # noqa: E402
 from lanceur import api, decoder, encoder, BASE, UID, journaliser  # noqa: E402
 
 ICI = os.path.dirname(os.path.abspath(__file__))
@@ -322,6 +330,18 @@ def lire_file_facebook():
             for l in lignes[1:]]
 
 
+def synchroniser_facebook_cloud():
+    """Pousse le lot local vers {{DEPOT_SITE}} si besoin, et ramène l'état
+    réel (ce qui est déjà publié par le cloud) dans la file locale — voir
+    synchroniser_publicateur_facebook.py. Fait avant surveiller_facebook() pour
+    que cette dernière lise une file à jour."""
+    r = subprocess.run([sys.executable, os.path.join(ICI, "synchroniser_publicateur_facebook.py")],
+                       capture_output=True, text=True, timeout=120)
+    if r.returncode != 0:
+        journaliser("vigie : synchroniser_publicateur_facebook.py a échoué — "
+                    + (r.stderr.strip() or r.stdout.strip())[-500:])
+
+
 def surveiller_facebook(etat_local, alertes):
     semaine = date.today().strftime("%G-S%V")
     # a) le bilan de santé complet (jeton, droits, file, minuterie)
@@ -355,9 +375,9 @@ def surveiller_facebook(etat_local, alertes):
                 f"facebook-silence-{semaine}",
                 f"⚠️ Aucune publication Facebook depuis {ecart} jours",
                 f"La dernière publication du lot date du {derniere} alors que "
-                f"{restants} texte(s) attendent encore. Les deux fenêtres du "
-                "publicateur (jeudi 18 h 30, dimanche 10 h) ont probablement été "
-                "ratées — machine éteinte ou panne. Vérifier :\n"
+                f"{restants} texte(s) attendent encore. La publication tourne dans "
+                "le cloud (mardi et samedi midi, heure de Montréal) — les deux "
+                "fenêtres ont probablement échoué côté GitHub Actions. Vérifier :\n"
                 "cd {{CHEMIN_INSTALLATION}} && python3 sante_facebook.py",
                 "Contenu"))
     if restants <= SEUIL_LOT_BAS and not etat_local.get("lot2_lance"):
@@ -497,6 +517,76 @@ def surveiller_site(etat_local, alertes):
         else:
             journaliser(f"vigie : compte GoatCounter confirmé (HTTP {code})")
             etat_local["goatcounter_verifie"] = "existe"
+
+
+# ── 7a. guichet caduc — fermer ce qui est déjà accompli ─────────────────────
+#
+# guichet_dormant() ne fait que COMPTER les jours d'attente ; il ne vérifie
+# jamais si la demande est encore utile. Une demande « publier ce guide »
+# peut très bien devenir caduque si le guide s'est retrouvé en ligne par un
+# autre chemin (ex. le pilote, via une chaîne d'auto-publication) avant
+# qu'on réponde au guichet. Cette fonction ferme ce qui est objectivement
+# déjà fait, avant que guichet_dormant() n'aille rappeler une chose qui n'a
+# plus lieu d'être.
+
+SITE_ROOT = os.path.dirname(os.path.dirname(SUJETS_TSV))
+
+
+def guichet_caduc(alertes):
+    guides_ecrits = [s for s in lire_sujets()
+                     if s.get("ETAT") == "ecrit" and s.get("FICHIER")]
+    if not guides_ecrits:
+        return
+    for nom, ch in requete_lancements("attente_autorisation"):
+        titre_demande = ch.get("titre") or ""
+        if not titre_demande:
+            continue
+        # Le titre de la demande contient presque toujours le titre du guide
+        # au mot près (« Article 2 — Sauvegarder les photos… », « Rédiger le
+        # guide « X » pour validation »). On confirme ensuite sur le fichier
+        # RÉEL — jamais sur le seul texte — avant de fermer quoi que ce soit.
+        guide = next((s for s in guides_ecrits if s["TITRE"] in titre_demande), None)
+        if not guide:
+            continue
+        chemin = os.path.join(SITE_ROOT, guide["FICHIER"])
+        if not os.path.exists(chemin):
+            continue  # ETAT dit « ecrit » mais le fichier n'y est pas — ne pas fermer sur un doute
+
+        raison = (f"Devenu caduc : le guide « {guide['TITRE']} » est déjà en "
+                  f"ligne ({guide['FICHIER']}), publié par un autre chemin "
+                  "après cette demande. Fermée automatiquement, rien à faire.")
+        if ESSAI:
+            print(f"[essai] fermerait comme caduque : {nom} — {titre_demande[:60]}")
+            continue
+        try:
+            lanceur.maj_doc(lanceur.COLLECTION_MARKETING, nom, {
+                "statut": "refuse",
+                "autorisationRefus": raison,
+                "autorisationRepondueLe": int(time.time() * 1000),
+                "finiLe": int(time.time() * 1000),
+                "erreur": raison,
+            })
+            fichier_md = ch.get("autorisationFichier")
+            if fichier_md:
+                chemin_md = os.path.join(lanceur.DOSSIER_AUTORISATIONS, fichier_md)
+                if os.path.exists(chemin_md):
+                    md = open(chemin_md, encoding="utf-8").read()
+                    md = md.replace("| Statut | **EN ATTENTE** |",
+                                    "| Statut | **CADUQUE — fermée automatiquement** |", 1)
+                    md = md.replace(
+                        "_En attente — répondre avec `autorisations.py accorder` ou `refuser`._",
+                        f"**CADUQUE** le {time.strftime('%Y-%m-%d %H:%M')} :\n\n> {raison}", 1)
+                    open(chemin_md, "w", encoding="utf-8").write(md)
+        except Exception as e:                               # noqa: BLE001
+            journaliser(f"vigie : fermeture caduque de {nom} impossible ({e!r})")
+            continue
+        journaliser(f"vigie : « {titre_demande[:70]} » fermée — caduque, "
+                    f"« {guide['TITRE']} » déjà en ligne")
+        alertes.append((
+            f"caduc-{nom}",
+            f"🗑️ Fermée automatiquement : « {guide['TITRE']} »",
+            raison + " Rien à répondre — c'est un simple avis.",
+            "Pilotage"))
 
 
 # ── 7. guichet dormant ──────────────────────────────────────────────────────
@@ -684,10 +774,16 @@ def main():
             lancements_geles(etat_local)
     except Exception as e:
         journaliser(f"vigie : vérification des lancements impossible ({e!r})")
+    try:
+        if reseau_pret():
+            synchroniser_facebook_cloud()
+    except Exception as e:
+        journaliser(f"vigie : synchronisation du publicateur Facebook cloud impossible ({e!r})")
     surveiller_facebook(etat_local, alertes)
     surveiller_site(etat_local, alertes)
     try:
         if reseau_pret():
+            guichet_caduc(alertes)
             guichet_dormant(alertes)
     except Exception as e:
         journaliser(f"vigie : lecture du guichet impossible ({e!r})")
@@ -729,5 +825,45 @@ def main():
     journaliser(f"vigie : passage terminé — {len(alertes)} alerte(s)")
 
 
+# ── passage allégé — le guichet seul, plus souvent ──────────────────────────
+#
+# Le passage complet (main()) ne tourne qu'une fois par jour, et ne vérifie
+# jamais lui-même si une demande est devenue inutile. Ce passage-ci ne fait
+# QUE le guichet — fermer ce qui est caduc, rappeler ce qui dort — sans
+# Facebook ni sonde du site, pour pouvoir tourner plusieurs fois par jour
+# sans peser sur les quotas. Minuterie : bg-vigie-guichet.timer.
+
+def guichet_seul():
+    journaliser("vigie : passage guichet" + (" (essai)" if ESSAI else ""))
+    if not reseau_pret():
+        journaliser("vigie : passage guichet — pas de réseau, reporté")
+        return
+    alertes = []
+    try:
+        guichet_caduc(alertes)
+        guichet_dormant(alertes)
+    except Exception as e:
+        journaliser(f"vigie : passage guichet impossible ({e!r})")
+        return
+    if not alertes:
+        journaliser("vigie : passage guichet terminé — rien à signaler")
+        return
+    try:
+        etat = etat_marketing()
+        modif = False
+        for cle, titre, detail, chantier, *extra in alertes:
+            if assurer_tache(etat, cle, titre, detail, chantier,
+                             echeance=date.today().isoformat(),
+                             client=extra[0] if extra else CLIENT):
+                modif = True
+        if modif:
+            etat["updatedAt"] = int(time.time() * 1000)
+            pousser_etat(etat)
+    except Exception as e:
+        journaliser(f"vigie : écriture au tableau (passage guichet) impossible ({e!r})")
+        return
+    journaliser(f"vigie : passage guichet terminé — {len(alertes)} alerte(s)")
+
+
 if __name__ == "__main__":
-    main()
+    guichet_seul() if "--guichet" in sys.argv else main()

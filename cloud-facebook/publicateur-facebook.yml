@@ -1,0 +1,57 @@
+name: Publicateur Facebook (mardi/samedi midi)
+
+on:
+  schedule:
+    # Deux passages UTC pour couvrir l'heure d'été et l'heure d'hiver —
+    # publicateur_cloud.py vérifie l'heure réelle dans votre fuseau et ne
+    # publie qu'à midi ; l'autre passage ne fait rien. Adaptez les deux
+    # heures UTC ci-dessous à VOTRE fuseau et à votre créneau de publication.
+    - cron: '0 16 * * 2,6'
+    - cron: '0 17 * * 2,6'
+  workflow_dispatch:
+    inputs:
+      essai:
+        description: "Essai à blanc (rien ne publie)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicateur-facebook
+  cancel-in-progress: false
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Publier (ou essai à blanc)
+        id: publicateur
+        env:
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+        run: |
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.essai || 'false' }}" = "true" ]; then
+            python3 automatisation/facebook/publicateur_cloud.py --essai
+          else
+            python3 automatisation/facebook/publicateur_cloud.py
+          fi
+
+      - name: Enregistrer l'état de la file si une publication est partie
+        if: always()
+        run: |
+          if ! git diff --quiet -- automatisation/facebook/_File_Facebook.tsv; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add automatisation/facebook/_File_Facebook.tsv
+            git commit -m "Publicateur Facebook (cloud) : ${{ steps.publicateur.outputs.resultat }}"
+            git push
+          else
+            echo "File inchangée — rien à commiter."
+          fi

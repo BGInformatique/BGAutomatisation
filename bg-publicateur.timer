@@ -2,11 +2,15 @@
 Description=Publication Facebook {{ENTREPRISE}} — jeudi 18 h 30 et dimanche 10 h
 
 [Timer]
-# Les deux fenêtres où le public résidentiel des Laurentides est sur Facebook
-# (Facebook-Residentiel-Lot-1.md). Le script lui-même garantit au plus une
-# publication par 3 jours : le dimanche ne rattrape que si le jeudi a sauté.
-# Pas de Persistent= : hors fenêtre, une publication ne vaut pas la peine —
-# la prochaine fenêtre la prendra.
+# Les deux fenêtres où votre public est sur Facebook (Facebook-Residentiel-Lot-1.md).
+# Le script lui-même garantit au plus une publication par 3 jours : la seconde
+# fenêtre ne rattrape que si la première a sauté. Pas de Persistent= : hors
+# fenêtre, une publication ne vaut pas la peine — la prochaine fenêtre la prendra.
+#
+# NE PAS ACTIVER en même temps que cloud-facebook/ (GitHub Actions) : les deux
+# publieraient EN DOUBLE. Cette version locale reste utile pour tester avec
+# `publicateur.py --essai` ; voir LISEZ-MOI_Publicateur.md pour le choix entre
+# les deux chemins de publication.
 OnCalendar=Thu *-*-* 18:30
 OnCalendar=Sun *-*-* 10:00
 
