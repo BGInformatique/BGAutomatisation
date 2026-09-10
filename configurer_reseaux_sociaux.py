@@ -103,6 +103,61 @@ def config_local_facebook():
     activer_minuterie("bg-publicateur.timer")
 
 
+def deployer_cloud(page_id, fuseau, chemin_site, forcer_ecrasement=False):
+    """Copie les deux fichiers cloud dans le dépôt du site. Fonction pure
+    (aucun input()/print()) réutilisée telle quelle par installer.py.
+
+    Retourne {"ok": True, "dest_py", "dest_yml"} ou
+    {"ok": False, "erreur", "existe_deja": [...]} (existe_deja rempli
+    seulement si le blocage vient de fichiers déjà présents et
+    forcer_ecrasement=False — laisse l'appelant redemander confirmation).
+    """
+    if not os.path.isdir(chemin_site):
+        return {"ok": False, "erreur": f"« {chemin_site} » n'existe pas"}
+
+    dest_py = os.path.join(chemin_site, "automatisation", "facebook", "publicateur_cloud.py")
+    dest_yml = os.path.join(chemin_site, ".github", "workflows", "publicateur-facebook.yml")
+    if not forcer_ecrasement:
+        deja = [d for d in (dest_py, dest_yml) if os.path.exists(d)]
+        if deja:
+            return {"ok": False, "existe_deja": deja}
+
+    os.makedirs(os.path.dirname(dest_py), exist_ok=True)
+    os.makedirs(os.path.dirname(dest_yml), exist_ok=True)
+
+    with open(os.path.join(CLOUD_DIR, "publicateur_cloud.py"), encoding="utf-8") as f:
+        contenu = f.read()
+    contenu = contenu.replace("{{PAGE_ID_FACEBOOK}}", page_id).replace("{{FUSEAU_HORAIRE}}", fuseau)
+    with open(dest_py, "w", encoding="utf-8") as f:
+        f.write(contenu)
+    shutil.copy(os.path.join(CLOUD_DIR, "publicateur-facebook.yml"), dest_yml)
+
+    return {"ok": True, "dest_py": dest_py, "dest_yml": dest_yml}
+
+
+def creer_secret_github(chemin_site, jeton):
+    """Tente `gh secret set FB_PAGE_TOKEN`. Fonction pure (aucun input()/
+    print()), réutilisée telle quelle par installer.py.
+
+    Retourne {"ok": bool, "gh_disponible": bool, "message": "..."}.
+    """
+    try:
+        r = subprocess.run(["gh", "auth", "status"], cwd=chemin_site,
+                            capture_output=True, text=True, timeout=15)
+    except FileNotFoundError:
+        r = None
+    if r is None or r.returncode != 0:
+        return {"ok": False, "gh_disponible": False, "message": (
+            "`gh` (CLI GitHub) absent ou non connecté — crée le secret à la main : "
+            "Settings → Secrets and variables → Actions → New repository secret → FB_PAGE_TOKEN."
+        )}
+    r2 = subprocess.run(["gh", "secret", "set", "FB_PAGE_TOKEN"], cwd=chemin_site,
+                         input=jeton, capture_output=True, text=True, timeout=30)
+    if r2.returncode == 0:
+        return {"ok": True, "gh_disponible": True, "message": "Secret FB_PAGE_TOKEN créé."}
+    return {"ok": False, "gh_disponible": True, "message": f"Échec : {r2.stderr.strip()} — crée-le à la main."}
+
+
 def config_cloud_facebook():
     cfg = lire_json(FACEBOOK_JETON)
     if cfg is None:
@@ -127,26 +182,20 @@ def config_cloud_facebook():
         if not confirmer(f"« {chemin_site} » ne ressemble pas à un dépôt git (pas de .git) — continuer quand même ?"):
             return
 
-    dest_py = os.path.join(chemin_site, "automatisation", "facebook", "publicateur_cloud.py")
-    dest_yml = os.path.join(chemin_site, ".github", "workflows", "publicateur-facebook.yml")
-    for dest in (dest_py, dest_yml):
-        if os.path.exists(dest) and not confirmer(f"« {dest} » existe déjà — écraser ?"):
-            print("Annulé — copie le reste toi-même si besoin.")
-            return
-
-    os.makedirs(os.path.dirname(dest_py), exist_ok=True)
-    os.makedirs(os.path.dirname(dest_yml), exist_ok=True)
-
-    with open(os.path.join(CLOUD_DIR, "publicateur_cloud.py"), encoding="utf-8") as f:
-        contenu = f.read()
-    contenu = contenu.replace("{{PAGE_ID_FACEBOOK}}", page_id).replace("{{FUSEAU_HORAIRE}}", fuseau)
-    with open(dest_py, "w", encoding="utf-8") as f:
-        f.write(contenu)
-    shutil.copy(os.path.join(CLOUD_DIR, "publicateur-facebook.yml"), dest_yml)
+    resultat = deployer_cloud(page_id, fuseau, chemin_site)
+    if not resultat["ok"] and resultat.get("existe_deja"):
+        for dest in resultat["existe_deja"]:
+            if not confirmer(f"« {dest} » existe déjà — écraser ?"):
+                print("Annulé — copie le reste toi-même si besoin.")
+                return
+        resultat = deployer_cloud(page_id, fuseau, chemin_site, forcer_ecrasement=True)
+    if not resultat["ok"]:
+        print(f"Annulé : {resultat.get('erreur', '?')}")
+        return
 
     print(f"\nCopiés dans {chemin_site} :")
-    print(f"  {dest_py}")
-    print(f"  {dest_yml}")
+    print(f"  {resultat['dest_py']}")
+    print(f"  {resultat['dest_yml']}")
     print("Rien n'a été commité ni poussé là-bas — ajoute tes contenus "
           "(Facebook-Residentiel-Lot-1.md, _File_Facebook.tsv, visuels/) au "
           "même dossier automatisation/facebook/, puis commit/push toi-même.")
@@ -158,24 +207,17 @@ def config_cloud_facebook():
 
 
 def offrir_secret_github(chemin_site, jeton):
-    try:
-        r = subprocess.run(["gh", "auth", "status"], cwd=chemin_site,
-                            capture_output=True, text=True, timeout=15)
-    except FileNotFoundError:
-        r = None
-    if r is None or r.returncode != 0:
-        print("\n`gh` (CLI GitHub) absent ou non connecté — crée le secret à la main :")
-        print("  Dépôt du site sur GitHub → Settings → Secrets and variables → "
-              "Actions → New repository secret → nom FB_PAGE_TOKEN.")
+    if not shutil.which("gh"):
+        print("\n`gh` (CLI GitHub) absent — crée le secret à la main : "
+              "Settings → Secrets and variables → Actions → New repository "
+              "secret → FB_PAGE_TOKEN.")
         return
     if not confirmer("\nCréer/mettre à jour le secret FB_PAGE_TOKEN dans ce dépôt avec gh secret set ?"):
         print("Pas créé — marche à suivre manuelle : Settings → Secrets and "
               "variables → Actions → New repository secret → FB_PAGE_TOKEN.")
         return
-    r2 = subprocess.run(["gh", "secret", "set", "FB_PAGE_TOKEN"], cwd=chemin_site,
-                         input=jeton, capture_output=True, text=True, timeout=30)
-    print("Secret FB_PAGE_TOKEN créé." if r2.returncode == 0
-          else f"Échec : {r2.stderr.strip()} — crée-le à la main.")
+    resultat = creer_secret_github(chemin_site, jeton)
+    print(resultat["message"])
 
 
 def assistant_facebook():

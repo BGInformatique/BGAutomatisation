@@ -10,21 +10,22 @@ cadre qu'on lui a fixé.
 
 ## Par où commencer
 
-1. `00-Demarrage/` — checklist des comptes à créer et installation d'OpenClaw
-   en mode gratuit. Prérequis de tout le reste.
-2. `PARAMETRES-A-CONFIGURER.md` — tous les jetons `{{...}}` à remplacer, et
-   ce qui est délibérément laissé en exemple plutôt que génériquement
-   configurable.
-3. `python3 configurer_reseaux_sociaux.py` — chemin rapide pour Facebook et
-   Instagram : guide les étapes une à une (Page, jeton, local ou cloud,
-   compte Instagram, hébergement des images) sans ouvrir les fichiers
-   ci-dessous, en s'appuyant dessus pour l'échange de jeton. Les
-   `LISEZ-MOI_*.md` restent la référence détaillée pour dépanner ou
-   comprendre le pourquoi de chaque étape.
-4. Un `LISEZ-MOI_*.md` par pièce : `LISEZ-MOI_Pilote.md`,
-   `LISEZ-MOI_Vigie.md`, `LISEZ-MOI_Publicateur.md`,
+1. **`python3 installer.py`** — chemin recommandé : ouvre une page dans le
+   navigateur et fait tout depuis là (comptes à cocher, installation
+   OpenClaw, tous les jetons `{{...}}` du § 1 de
+   `PARAMETRES-A-CONFIGURER.md`, connexion Facebook/Instagram, installation
+   des services systemd) — aucun autre terminal à ouvrir une fois lancé. Le
+   port par défaut (8420) est fixe ; s'il est occupé, une page dans le
+   navigateur en propose un autre, jamais une question dans le terminal.
+2. Si vous préférez la ligne de commande, ou en dépannage : `00-Demarrage/`
+   (checklist des comptes + install OpenClaw), `PARAMETRES-A-CONFIGURER.md`
+   (tableau complet des jetons), `python3 configurer_reseaux_sociaux.py`
+   (Facebook/Instagram en CLI), et un `LISEZ-MOI_*.md` par pièce :
+   `LISEZ-MOI_Pilote.md`, `LISEZ-MOI_Vigie.md`, `LISEZ-MOI_Publicateur.md`,
    `LISEZ-MOI_Publicateur_Instagram.md`, `LISEZ-MOI_Courriels_Mandat_Exemple.md`,
-   `LISEZ-MOI_Espace_Client.md`.
+   `LISEZ-MOI_Espace_Client.md`. `installer.py` s'appuie sur ces mêmes
+   scripts (import direct, rien de dupliqué) — les deux chemins restent
+   cohérents entre eux.
 
 ## Les pièces
 
@@ -38,7 +39,8 @@ cadre qu'on lui a fixé.
 | `publicateur.py` / `publicateur_instagram.py` | Publication automatique Facebook (local) / Instagram, une fois par semaine |
 | `cloud-facebook/` | Jumeau de `publicateur.py` pensé pour GitHub Actions — publie même l'ordinateur éteint, voir `LISEZ-MOI_Publicateur.md` § Cloud vs local |
 | `synchroniser_publicateur_facebook.py` | Tient la copie locale et la copie du dépôt cloud alignées, lancé par `vigie.py` |
-| `configurer_reseaux_sociaux.py` | Assistant unique : orchestre les deux lignes ci-dessous, guide Facebook et Instagram de bout en bout |
+| `installer.py` | Installateur web : lance un serveur local (127.0.0.1 seulement) et fait tout — comptes, OpenClaw, jetons `{{...}}`, réseaux sociaux, services systemd — depuis le navigateur |
+| `configurer_reseaux_sociaux.py` | Équivalent CLI, pour Facebook et Instagram seulement, si on préfère le terminal |
 | `installer_jeton.py` / `configurer_facebook.py` / `configurer_instagram.py` / `renouveler_instagram.py` | Mise en place et renouvellement des jetons Facebook / Instagram |
 | `sante_facebook.py` | Diagnostic en un coup d'œil du montage Facebook (local ET cloud) |
 | `prospecteur.py` / `recherchiste.py` | Cycle de prospection : trouve des candidats, rédige les premiers contacts et relances |

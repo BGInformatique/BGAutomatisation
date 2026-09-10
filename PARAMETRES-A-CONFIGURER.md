@@ -8,8 +8,14 @@ d'un accord humain à un guichet d'autorisations en clair. Ce qui suit couvre
 ce qui reste à fournir avant de faire tourner cette copie pour une autre
 entreprise.
 
-**Avant tout le reste :** faites `00-Demarrage/` — comptes, logiciels,
-OpenClaw en mode gratuit. C'est le prérequis de tout ce qui suit.
+**Chemin recommandé :** `python3 installer.py` fait tout ce qui suit (jetons
+compris) depuis une page dans le navigateur, sans avoir à lire ce fichier en
+détail — voir `LISEZ-MOI.md`. Ce qui suit reste la référence complète pour
+comprendre chaque jeton, dépanner, ou configurer à la main.
+
+**Avant tout le reste (si vous ne passez pas par `installer.py`) :** faites
+`00-Demarrage/` — comptes, logiciels, OpenClaw en mode gratuit. C'est le
+prérequis de tout ce qui suit.
 
 ## 1. Jetons `{{...}}` à remplacer partout
 
