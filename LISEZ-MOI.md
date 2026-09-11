@@ -10,13 +10,32 @@ cadre qu'on lui a fixé.
 
 ## Par où commencer
 
-1. **`python3 installer.py`** — chemin recommandé : ouvre une page dans le
-   navigateur et fait tout depuis là (comptes à cocher, installation
-   OpenClaw, tous les jetons `{{...}}` du § 1 de
-   `PARAMETRES-A-CONFIGURER.md`, connexion Facebook/Instagram, installation
-   des services systemd) — aucun autre terminal à ouvrir une fois lancé. Le
-   port par défaut (8420) est fixe ; s'il est occupé, une page dans le
-   navigateur en propose un autre, jamais une question dans le terminal.
+1. **`python3 installer.py`** (ou le binaire empaqueté — voir plus bas) —
+   chemin recommandé : ouvre une page dans le navigateur et fait tout depuis
+   là (comptes à cocher, installation OpenClaw, tous les jetons `{{...}}` du
+   § 1 de `PARAMETRES-A-CONFIGURER.md`, connexion Facebook/Instagram,
+   installation des automatisations planifiées) — aucun autre terminal à
+   ouvrir une fois lancé. Fonctionne sur Linux (systemd), macOS (launchd) et
+   Windows (Tâches planifiées) — voir `planificateur.py`, qui traduit les
+   fichiers `bg-*.service`/`.timer` (source unique de vérité) vers le bon
+   mécanisme natif selon l'OS détecté. Sous Windows, un daemon continu
+   (`bg-lanceur`, `bg-pont-clients`, etc.) devient une tâche « au démarrage
+   de session » plutôt qu'un vrai service supervisé — schtasks seul, sans
+   dépendance externe (NSSM/pywin32), ne relance pas un processus planté ;
+   documenté dans la page, pas caché. Le port par défaut (8420) est fixe ;
+   s'il est occupé, une page dans le navigateur en propose un autre, jamais
+   une question dans le terminal.
+
+   **Binaire autonome (pas besoin de Python installé)** : construit sur les
+   trois OS par `.github/workflows/build-installer.yml` et publié comme
+   [Release GitHub](../../releases) — `pyinstaller --onefile
+   --hidden-import configurer_facebook --hidden-import configurer_instagram
+   --hidden-import configurer_reseaux_sociaux --hidden-import planificateur
+   --name BGAutomatisation-Installateur installer.py` pour le construire
+   soi-même. Le binaire ne fait QUE l'installateur : posez-le dans le même
+   dossier que le reste du dépôt avant de le lancer, les scripts (`pilote.py`,
+   `vigie.py`, etc.) restent de vrais fichiers `.py` à côté, lancés avec un
+   Python trouvé sur le poste cible.
 2. Si vous préférez la ligne de commande, ou en dépannage : `00-Demarrage/`
    (checklist des comptes + install OpenClaw), `PARAMETRES-A-CONFIGURER.md`
    (tableau complet des jetons), `python3 configurer_reseaux_sociaux.py`
@@ -39,7 +58,8 @@ cadre qu'on lui a fixé.
 | `publicateur.py` / `publicateur_instagram.py` | Publication automatique Facebook (local) / Instagram, une fois par semaine |
 | `cloud-facebook/` | Jumeau de `publicateur.py` pensé pour GitHub Actions — publie même l'ordinateur éteint, voir `LISEZ-MOI_Publicateur.md` § Cloud vs local |
 | `synchroniser_publicateur_facebook.py` | Tient la copie locale et la copie du dépôt cloud alignées, lancé par `vigie.py` |
-| `installer.py` | Installateur web : lance un serveur local (127.0.0.1 seulement) et fait tout — comptes, OpenClaw, jetons `{{...}}`, réseaux sociaux, services systemd — depuis le navigateur |
+| `installer.py` | Installateur web : lance un serveur local (127.0.0.1 seulement) et fait tout — comptes, OpenClaw, jetons `{{...}}`, réseaux sociaux, services planifiés — depuis le navigateur, sur les trois OS |
+| `planificateur.py` | Traduit les `bg-*.service`/`.timer` vers systemd/launchd/schtasks selon l'OS détecté — utilisé par `installer.py`, appelable seul (`python3 planificateur.py lister`) |
 | `configurer_reseaux_sociaux.py` | Équivalent CLI, pour Facebook et Instagram seulement, si on préfère le terminal |
 | `installer_jeton.py` / `configurer_facebook.py` / `configurer_instagram.py` / `renouveler_instagram.py` | Mise en place et renouvellement des jetons Facebook / Instagram |
 | `sante_facebook.py` | Diagnostic en un coup d'œil du montage Facebook (local ET cloud) |
