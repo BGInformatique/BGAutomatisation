@@ -41,7 +41,15 @@ import threading
 import urllib.parse
 import webbrowser
 
-ICI = os.path.dirname(os.path.abspath(__file__))
+# Une fois empaqueté (PyInstaller --onefile), __file__ pointe vers le dossier
+# TEMPORAIRE d'extraction du binaire, pas vers l'endroit réel sur le disque
+# où il tourne — les bg-*.service, cloud-facebook/, LISEZ-MOI_*.md, etc.
+# doivent être cherchés à côté de l'exécutable lui-même (là où l'acheteur
+# l'a posé, dans sa copie clonée du dépôt), pas dans ce dossier jetable.
+if getattr(sys, "frozen", False):
+    ICI = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    ICI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ICI)
 
 import configurer_facebook  # noqa: E402
