@@ -8,7 +8,10 @@ comptes, clé API OpenRouter et santé d'OpenClaw, remplacement des jetons
 `{{...}}`, connexion Facebook et Instagram (jetons Graph API échangés
 directement depuis cette page — la logique d'appel à l'API reste dans
 configurer_facebook.py/configurer_instagram.py, importée ici, pas
-dupliquée), et activation des services systemd.
+dupliquée), et installation des services planifiés — systemd sous Linux,
+launchd sous macOS, Tâches planifiées sous Windows (voir planificateur.py,
+qui traduit les fichiers bg-*.service/.timer, source unique de vérité, vers
+le bon mécanisme natif selon l'OS détecté).
 
 Seul `python3 installer.py` lui-même se lance dans un terminal — tout ce qui
 suit reste dans le navigateur. `configurer_reseaux_sociaux.py` reste dans ce
@@ -28,6 +31,7 @@ import glob
 import http.server
 import json
 import os
+import platform
 import re
 import secrets
 import shutil
@@ -43,6 +47,7 @@ sys.path.insert(0, ICI)
 import configurer_facebook  # noqa: E402
 import configurer_instagram  # noqa: E402
 import configurer_reseaux_sociaux as reseaux_sociaux  # noqa: E402
+import planificateur  # noqa: E402
 
 ETAT_PATH = os.path.join(ICI, ".installateur-etat.json")
 
@@ -290,6 +295,43 @@ def installer_systemd(selection):
     return rapport
 
 
+# --- Dispatch multi-OS (voir planificateur.py) ---------------------------
+# Linux : comportement ci-dessus, INCHANGÉ, granularité par fichier
+# (bg-x.service ET bg-x.timer listés/cochés séparément, comme avant).
+# macOS/Windows : granularité par UNITÉ LOGIQUE (planificateur.py regroupe
+# .service+.timer sous un seul nom, ex. "bg-pilote") puisqu'il n'y a qu'un
+# seul objet natif (agent launchd, tâche planifiée) par unité sur ces OS.
+
+def unites_planifiees():
+    if platform.system() == "Linux":
+        return unites_systemd()
+    minutees, continues = planificateur.analyser_toutes_unites(ICI)
+    return [{"nom": u.nom, "statut": planificateur.statut_natif(u.nom)} for u in minutees + continues]
+
+
+def installer_unites(selection):
+    if platform.system() == "Linux":
+        return installer_systemd(selection)
+    minutees, continues = planificateur.analyser_toutes_unites(ICI)
+    par_nom = {u.nom: u for u in minutees + continues}
+    unites_minutees = {u.nom for u in minutees}
+    rapport = []
+    for nom in selection:
+        u = par_nom.get(nom)
+        if u is None:
+            rapport.append(f"{nom} : introuvable.")
+            continue
+        fn = planificateur.installer_unite_minutee if nom in unites_minutees else planificateur.installer_unite_continue
+        r = fn(u, repertoire=ICI)
+        if r.get("ok"):
+            rapport.append(f"{nom} : installé(e) ({', '.join(r.get('taches') or [r.get('plist', '')])}).")
+            for lim in r.get("limites", []):
+                rapport.append(f"{nom} : ATTENTION — {lim}")
+        else:
+            rapport.append(f"{nom} : erreur — {r.get('erreur', 'échec inconnu')}")
+    return rapport
+
+
 # --- OpenClaw, non interactif --------------------------------------------
 # `openclaw configure` (le flux interactif classique) n'a pas d'équivalent
 # non interactif complet. Mais `openclaw config patch --stdin` accepte un
@@ -496,14 +538,18 @@ section 6 ci-dessous. Cloud (recommandé, marche même l'ordinateur éteint) :</
 <p class="note">Hébergement public des images : pas automatisable ici (dépend
 de votre hébergement statique) — voir LISEZ-MOI_Publicateur_Instagram.md § 3.</p>
 
-<h2>6. Services systemd</h2>
+<h2 id="titre-unites">6. Services planifiés</h2>
 <ul class="check" id="liste-systemd"></ul>
 <button id="btn-rafraichir-systemd">Rafraîchir l'état</button>
 <button id="btn-installer-systemd">Installer et activer la sélection</button>
 <pre id="rapport-systemd" hidden></pre>
-<p class="avert">bg-lanceur.service n'a pas de fichier fourni — à créer sur le
-patron de bg-pont-clients.service (voir § 12 de PARAMETRES-A-CONFIGURER.md),
-puis <code>systemctl --user enable --now bg-lanceur.service</code> à la main.</p>
+<p class="avert" id="avert-lanceur"></p>
+<p class="avert" id="avert-limites-os" hidden>Sur cet OS, certains réglages
+systemd n'ont pas d'équivalent simple et ne sont pas reproduits (rattrapage
+d'un passage manqué, délai aléatoire) — le rapport ci-dessus précise, unité
+par unité, ce qui s'applique. Sous Windows, un service continu devient une
+tâche « au démarrage de session », pas un vrai service supervisé (pas de
+relance automatique s'il plante).</p>
 
 <h2>Terminer</h2>
 <button class="danger" id="btn-arreter">Arrêter l'installateur</button>
@@ -594,7 +640,7 @@ function dessinerJetons() {
 function dessinerSystemd() {
   const ul = document.getElementById("liste-systemd");
   ul.innerHTML = "";
-  for (const u of ETAT.systemd) {
+  for (const u of ETAT.unites || []) {
     const li = document.createElement("li");
     const label = document.createElement("label");
     label.className = "case";
@@ -610,6 +656,15 @@ function dessinerSystemd() {
     li.appendChild(label);
     ul.appendChild(li);
   }
+
+  const os = ETAT.os_cible;
+  document.getElementById("titre-unites").textContent =
+    "6. Services " + (os === "Linux" ? "systemd" : os === "Darwin" ? "(launchd)" : os === "Windows" ? "(Tâches planifiées)" : "planifiés");
+  document.getElementById("avert-lanceur").textContent =
+    os === "Linux"
+      ? "bg-lanceur.service n'a pas de fichier fourni — à créer sur le patron de bg-pont-clients.service (voir § 12 de PARAMETRES-A-CONFIGURER.md), puis systemctl --user enable --now bg-lanceur.service à la main."
+      : "Le daemon lanceur.py n'a pas de fichier fourni pour cet OS — à installer à la main sur le patron des autres services continus (voir § 12 de PARAMETRES-A-CONFIGURER.md et planificateur.py).";
+  document.getElementById("avert-limites-os").hidden = (os === "Linux");
 }
 
 document.getElementById("btn-openclaw-installer").addEventListener("click", async () => {
@@ -793,9 +848,13 @@ document.getElementById("btn-installer-systemd").addEventListener("click", async
   const selection = Array.from(document.querySelectorAll("#liste-systemd input:checked"))
     .map((cb) => cb.dataset.nom);
   if (!selection.length) { alert("Aucune unité cochée."); return; }
-  if (!confirm("Installer et ACTIVER (systemctl --user enable --now) " + selection.length + " unité(s) ?")) return;
+  const verbe = ETAT.os_cible === "Linux" ? "Installer et ACTIVER (systemctl --user enable --now)"
+    : ETAT.os_cible === "Darwin" ? "Installer et charger (launchctl load)"
+    : ETAT.os_cible === "Windows" ? "Créer les tâches planifiées (schtasks)"
+    : "Installer";
+  if (!confirm(verbe + " " + selection.length + " unité(s) ?")) return;
   try {
-    const rep = await appelApi("/api/systemd/installer", { unites: selection });
+    const rep = await appelApi("/api/unites/installer", { unites: selection });
     const pre = document.getElementById("rapport-systemd");
     pre.hidden = false;
     pre.textContent = rep.rapport.join("\\n");
@@ -856,7 +915,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "valeurs_jetons": etat.get("valeurs_jetons", {}),
                 "tokens": TOKENS,
                 "jetons_restants": jetons_restants(),
-                "systemd": unites_systemd(),
+                "unites": unites_planifiees(),
+                "os_cible": platform.system(),
                 "etat_facebook": reseaux_sociaux.etat_facebook(),
                 "etat_instagram": reseaux_sociaux.etat_instagram(),
                 "openclaw_disponible": openclaw_disponible(),
@@ -963,8 +1023,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             ouvert = tenter_ouvrir_terminal(corps.get("commande", ""))
             self._repondre(200, json.dumps({"ouvert": ouvert}))
 
-        elif chemin == "/api/systemd/installer":
-            rapport = installer_systemd(corps.get("unites", []))
+        elif chemin == "/api/unites/installer":
+            rapport = installer_unites(corps.get("unites", []))
             self._repondre(200, json.dumps({"rapport": rapport}))
 
         elif chemin == "/api/arreter":
