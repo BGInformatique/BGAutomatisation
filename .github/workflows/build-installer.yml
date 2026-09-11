@@ -1,0 +1,86 @@
+name: Construire l'installateur (Linux/macOS/Windows)
+
+# Construit installer.py en binaire autonome sur les trois OS, le teste
+# RÉELLEMENT (démarrage + requête HTTP, voir .github/scripts/smoke_test.py)
+# et vérifie planificateur.py en conditions réelles (installe puis retire
+# une tâche factice via launchctl/schtasks — voir `planificateur.py
+# auto-test`). C'est la seule vérification possible des back-ends
+# macOS/Windows depuis une machine de développement Linux.
+#
+# Déclencheurs : à la main (workflow_dispatch, pour vérifier avant de
+# publier) et sur un tag `v*` (publie alors un Release avec les 3 binaires).
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            nom_binaire: BGAutomatisation-Installateur
+          - os: macos-latest
+            nom_binaire: BGAutomatisation-Installateur
+          - os: windows-latest
+            nom_binaire: BGAutomatisation-Installateur.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer PyInstaller
+        run: pip install pyinstaller
+
+      - name: Construire le binaire
+        run: >
+          pyinstaller --onefile
+          --hidden-import configurer_facebook
+          --hidden-import configurer_instagram
+          --hidden-import configurer_reseaux_sociaux
+          --hidden-import planificateur
+          --name BGAutomatisation-Installateur
+          installer.py
+
+      - name: Test de fumée — le binaire démarre et répond
+        run: python .github/scripts/smoke_test.py dist/${{ matrix.nom_binaire }}
+
+      - name: Vérifier planificateur.py en conditions réelles sur cet OS
+        run: python planificateur.py auto-test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installateur-${{ matrix.os }}
+          path: dist/${{ matrix.nom_binaire }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefacts
+
+      - name: Publier le Release avec les 3 binaires
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "artefacts/installateur-ubuntu-latest/BGAutomatisation-Installateur#Linux (x86_64)" \
+            "artefacts/installateur-macos-latest/BGAutomatisation-Installateur#macOS" \
+            "artefacts/installateur-windows-latest/BGAutomatisation-Installateur.exe#Windows" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
